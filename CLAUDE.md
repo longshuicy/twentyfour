@@ -52,16 +52,46 @@ src/lib/deck.ts       pure buildDeck(seed, level) -> Hand[]
 src/lib/hand.ts       in-play tile bag + undo
 src/lib/challenge.ts  URL-fragment encode/decode
 src/lib/storage.ts    localStorage (name, bests, history)
-src/components/       Board (pointer-event drag), CardFace
+src/lib/sound.ts      three cue clips + mute toggle, all failing soft
+src/assets/*.mp3      long wait / give up / succeed clips
+src/components/       Board (pointer-event drag), CardFace, Icons (inline SVG)
 src/App.tsx           screens: home / intro / play / done
 ```
 
+## Copy
+
+- **No em dashes anywhere in user-facing copy.** Use a comma, colon, or
+  parentheses, or split the sentence. En dashes in ranges (`A–K`, `A–9`) are
+  fine, they are range markers.
+- Units live in the formatter, not the call site: `formatTime` already appends
+  `s` to sub-minute values, so never write `{formatTime(t)}s`.
+
 ## Style
 
-- Palette is black / white / grey / red only. **Red is spent on exactly two
+- Dark ground, white / grey type, red only. **Red is spent on exactly two
   things: the primary CTA and the give-up / penalty state.** Red suit glyphs use
-  `--red-muted` so decoration never competes with the button.
-- Pointer events for drag. No HTML5 drag-and-drop, no DnD library.
+  `--red-muted` so decoration never competes with the button — and the drop
+  wheel's selected operator is white, not red, for the same reason.
+- `--ink` is the foreground and `--paper` the ground, as in the light build;
+  only the values flipped. Cards sit on `--card-face`, one step lighter than
+  the page.
+- Card size is fluid: set `--card-w` (a `clamp()`) and everything else — height,
+  rank size, corner size, wheel geometry — is derived from it. Don't hardcode
+  card pixel sizes at breakpoints.
+- Icons are inline SVG on `currentColor` (`src/components/Icons.tsx`), never
+  emoji: emoji ignore the palette and render differently per platform.
+- Your own result in a saved history entry is the **last** one in `results`,
+  not the one matching your name — renaming yourself must not erase your record.
+- Sound is a bonus, never the message: every cue has a visual that means the
+  same thing. Import clips from `src/assets` (never a literal `/assets/...`
+  path — it 404s under the Pages base) and let every audio call fail silently.
+- A running CSS animation outranks the inline transform the drag writes, so any
+  card-level animation must exclude `.dragging` and `.armed`, or dragging stops
+  following the pointer.
+- Pointer events for drag. No HTML5 drag-and-drop, no DnD library. The drop
+  target's op picker is a radial wheel that overflows the card (so a finger
+  can't cover the choices); its selection is by *direction* from the card's
+  centre, with a hub dead zone and a sticky margin outside the card.
 - No new runtime dependencies without a clear reason. Current runtime deps are
   React and React DOM, full stop.
 

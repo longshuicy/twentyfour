@@ -6,7 +6,7 @@ import { decodeChallenge, encodeChallenge, type Challenge } from './challenge';
 
 const SEEDS = ['7QK2M', 'ABCDEF', 'ZZZ999', '2345678', 'K7P3RQ'];
 
-describe('deck determinism — the core multiplayer invariant', () => {
+describe('deck determinism: the core multiplayer invariant', () => {
   it('is a pure function of (seed, level)', () => {
     for (const seed of SEEDS) {
       for (const level of ['easy', 'hard'] as const) {

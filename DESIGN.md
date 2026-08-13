@@ -273,11 +273,35 @@ reset below.
 
 ### Drag to combine
 
-Drag any card onto any other card. On hover, the target card reveals four
-quadrants: `+  −  ×  ÷`. Releasing over a quadrant applies that operation.
-The two source cards are removed and **one new card** holding the result takes
-the target's slot. Repeat until one card remains; if it reads 24, the hand is
-won.
+Drag any card onto any other card. On hover, the target card raises a **radial
+op wheel** — `+` up, `×` right, `−` down, `÷` left — and releasing on a spoke
+applies that operation. The two source cards are removed and **one new card**
+holding the result takes the target's slot. Repeat until one card remains; if
+it reads 24, the hand is won.
+
+**The dragged card does not move.** It stays in its slot, dimmed and dashed to
+read as picked up, and a small proxy card carrying just its value follows the
+pointer above everything else. Dragging the full-size card was the first
+version and it fought the wheel: a whole card under the pointer covered the
+target it was being aimed at. The proxy sits up and to the left on the
+diagonal, because the four spokes are at the compass points and straight up put
+it on top of `+` exactly when `+` was the choice being made.
+
+The wheel replaced a four-quadrant overlay drawn *inside* the target card. The
+overlay was unusable for the reason every in-place picker is: the hand doing
+the dragging sits on top of the card, so the choices were under the player's
+own finger. The wheel is larger than the card and its spokes sit outside the
+card's edges, which puts every option in clear air.
+
+Two consequences fall out of that geometry, and both are deliberate:
+
+- **Choice is by direction from the target's centre, not by position inside
+  it.** A dead zone at the hub means a drag that lands dead-centre selects
+  nothing — a drop there is a no-op rather than an arbitrary operation.
+- **An armed target stays armed while the pointer strays outside it**, up to
+  about half a card. The outer half of each spoke is beyond the card's own
+  bounds; without stickiness those pixels would deselect the target the moment
+  the player reached for the thing they were aiming at.
 
 ### Operand order
 
@@ -287,22 +311,56 @@ left operand.**
 - Drag 7 onto 3 → `7 − 3`
 - Drag 3 onto 7 → `3 − 7`
 
-So the quadrants stay a simple `+ − × ÷`, and reversing an operation is just
+So the wheel stays a simple `+ − × ÷`, and reversing an operation is just
 dragging the other direction. The alternative — six zones labeled `a−b` /
 `b−a` — is unambiguous but fiddly on a phone.
 
+### Feedback: three moments, sound plus motion
+
+Three things happen to a player that deserve a response, and each gets one
+visual cue and one short clip:
+
+| Moment | Visual | Sound |
+| --- | --- | --- |
+| 30s on one hand | board breathes, staggered; a line appears naming the elapsed time and the give-up price | `long_wait_meow` |
+| Give up | the screen shakes once | `dog_giveup_woof` |
+| Made 24 | the cards pop and outline in white, held for 750ms before the next deal | `succeed_meow` |
+
+**The visual carries the meaning; the sound is a bonus.** Audio is muted,
+blocked by autoplay policy until the first gesture, or simply off far more
+often than it plays, so nothing may depend on hearing it. The clips are
+imported through Vite rather than referenced by path, so they are fingerprinted
+and rewritten for the `/twentyfour/` base — a literal `/assets/…` URL 404s on
+GitHub Pages. A mute toggle sits next to the hand counter and persists.
+
+The long-wait nudge fires **once per hand**, not once per tick, and never while
+the answer is on screen. Repeating it every 30 seconds would turn a hard hand
+into nagging.
+
+All motion is suppressed under `prefers-reduced-motion`. One subtlety worth
+keeping in mind if these are ever edited: a running CSS animation outranks the
+inline transform the drag writes, so any card-level animation has to exclude
+`.dragging` and `.armed` or dragging silently stops tracking the pointer.
+
 ### Required affordances
 
-- **Undo** — a step-back stack. People misdrop constantly.
-- **Reset hand** — return to the four dealt cards.
+- **Undo**: a step-back stack. People misdrop constantly.
+- **Reset hand**: return to the four dealt cards.
+- **Start over**: restart the whole run from hand 1 on the same deck. Undo and
+  Reset are free and instant, so they act on the first tap; this one throws
+  away a run in progress, so it asks once and disarms itself after three
+  seconds rather than sitting hot for the rest of the hand.
 - Fractional results display as fractions (`24/7`), never decimals.
+- Times carry their unit in the formatter, not at the call site: `41.3s` under a
+  minute, `2:23.1` above it. A bare number says nothing, and `2:23.1s` is an
+  `s` stapled to a clock reading.
 
 ### Implementation note
 
 Use **pointer events** (`pointerdown` / `pointermove` / `pointerup` +
 `setPointerCapture`), not HTML5 drag-and-drop (miserable on touch) and not a
 DnD library (overkill for four targets). ~80 lines, identical behavior on
-mouse and touch, full control over quadrant hit-testing.
+mouse and touch, full control over wheel hit-testing.
 
 ---
 
@@ -318,13 +376,27 @@ No share affordance during a run; it invites leaving mid-timer. On completion:
 ```
 143.2s · hard · 1 gave up
 
-[ Challenge someone to beat this ]
-copies a link — paste it anywhere
+Your challenge link
+[ https://…/twentyfour/#c=eyJzIjoi… ] [ Copy ]
+
+Send it to someone yourself, in a message or an email. Whoever opens
+it plays the exact same 13 hands, in the same order, racing your
+143.2s. When they finish they see who won, and they get a link back
+to you with both times in it.
 ```
 
-Label by outcome, not mechanism. Use `navigator.share()` where available,
-clipboard-copy fallback otherwise, and confirm inline ("Link copied — send it
-to them"). Never show the raw URL unless asked.
+**Show the URL. Copy is the only thing the app does.** This went through two
+worse drafts. The first read `[ Send Chen your result ]`, which was simply
+false: nothing is sent, there is no recipient and no server. The second said
+*Share challenge link* and called `navigator.share()`, which is better but
+still leaves a player unsure whether anything left the device, because on some
+platforms the share sheet looks exactly like sending.
+
+Putting the link on screen settles it. You can see the thing that exists, the
+button next to it says `Copy`, and the sentence underneath says the sending is
+yours to do. If the clipboard write is refused (denied permission, insecure
+origin) the field selects itself instead, so the player can copy by hand rather
+than being told it worked when it did not.
 
 ### Receiving — before the first card
 
@@ -337,10 +409,15 @@ hard · 12 hands · time to beat 143.2s
 
 Without this, the recipient thinks it is an ordinary game and the framing is
 lost. During play, the target stays passive: grey `vs 143.2` beside the
-running clock — not a countdown, not a warning. On finishing, the reply is
-pre-framed: `[ Send Chen your result ]`, not a generic share button.
+running clock — not a countdown, not a warning. On finishing, the reply link
+is the same copy-a-link flow described above, with the challenger's time
+already carried inside it.
 
 ### Smaller calls
+
+- **Easy leads on the home screen and is the primary button.** A–9 is the
+  version most people can actually finish; hard is one tap below it. Opening
+  with the hardest option is a filter, not a welcome.
 
 - Name is entered **once**, stored in `localStorage`, reused. Prompting at
   share time adds friction at the exact moment you want a single tap.
@@ -352,9 +429,20 @@ pre-framed: `[ Send Chen your result ]`, not a generic share button.
 
 ## 7. Visual design
 
-Minimalist. Palette is **black / white / grey / red**.
+Minimalist and **dark-ground**: near-black page, white and grey type, red as
+the single accent.
 
-- Black on white for structure and card faces.
+- Cards sit one step lighter than the page so they read as objects on a
+  surface rather than holes cut in it. That separation is the whole reason the
+  ground is not pure black.
+- **The banner is the one element allowed to shout.** "TwentyFour" spelled out,
+  fluid up to 76px, with the tagline in spaced small caps beneath it. Nothing
+  else on the home screen competes: the house rules underneath are small and
+  set in grey, because they are read once and then never again.
+- Card size is fluid (`clamp()` on a single `--card-w` custom property, with
+  height derived from it), so one rule covers a 375px phone and a desktop
+  window. On desktop the column also widens and centres vertically instead of
+  hugging the top of a tall window.
 - Grey for passive information: the opponent's target time, card chrome,
   disabled controls, hand counter.
 - **Red is the single accent and gets spent on exactly two things:** the
@@ -364,6 +452,36 @@ Minimalist. Palette is **black / white / grey / red**.
 Card faces are typographic — rank and suit glyph, no illustration. Red suits
 (♥ ♦) are the one place red appears decoratively; keep it the same red or a
 slightly muted variant so it does not compete with the CTA.
+
+**The middle of a card shows its number, always.** A reads 1, J/Q/K read
+11/12/13, and the letters survive in the four corner indices. The centre is the
+operand you are doing arithmetic with; making the player translate a letter
+every time is a tax with no upside, and once J/Q/K are numeric, leaving the ace
+alone is an inconsistency rather than a kindness. All four corners are upright:
+the traditional 180°-rotated bottom pair makes a rotated ♥ read as a ♠ at this
+size.
+
+---
+
+### Seeing your own record
+
+Bests, run history and the head-to-head tally were all being written from the
+first build and never shown anywhere — the data existed, the screen did not.
+There is now a **Your record** screen, reached from a quiet strip under the
+play buttons (and repeated on the result screen), holding:
+
+- best time per level, runs played, and how many were cleared without a give-up
+- the head-to-head tally across decks people sent you
+- the last ten runs, each marked with the rival's name where the deck was a
+  match, and coloured by whether you beat them
+
+Two decisions worth keeping. **Your own row is identified by position, not by
+name** — `finish()` appends the local player last, and matching on name would
+lose your whole history the moment you renamed yourself, or claim an opponent's
+row when you both picked the same name. And the screen says plainly that this
+lives in one browser: no account exists to sync it, so a different device or a
+cleared browser starts from zero. Better to say so than to let someone
+discover it.
 
 ---
 
