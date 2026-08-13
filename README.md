@@ -57,5 +57,9 @@ If you rename the repo, update `base` in `vite.config.ts` to match.
 
 ## Docs
 
-- `DESIGN.md` — the full design, with reasoning
-- `CLAUDE.md` — invariants and working notes
+- `DESIGN.md`: the full design, with reasoning
+- `CLAUDE.md`: invariants and working notes
+
+## License
+
+MIT. See [LICENSE](LICENSE).
