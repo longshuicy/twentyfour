@@ -1,0 +1,410 @@
+/* Minimalist: black / white / grey, red as the single accent.
+   Red is spent on exactly two things — the primary CTA and the give-up /
+   penalty state — plus a muted variant for red suit glyphs so decoration
+   never competes with the button. */
+
+:root {
+  --ink: #111111;
+  --paper: #ffffff;
+  --grey-900: #333333;
+  --grey-600: #767676;
+  --grey-300: #d4d4d4;
+  --grey-100: #f2f2f2;
+  --red: #d81f26;
+  --red-muted: #b4565a;
+
+  --radius: 10px;
+  --card-w: 104px;
+  --card-h: 148px;
+
+  font-family: ui-sans-serif, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-synthesis: none;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+}
+
+.app {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---------- type ---------- */
+
+h1 {
+  font-size: 40px;
+  letter-spacing: -0.03em;
+  margin: 0;
+  font-weight: 800;
+}
+
+h2 {
+  font-size: 19px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.muted {
+  color: var(--grey-600);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+.tiny {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ---------- buttons ---------- */
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+  border: 1px solid var(--grey-300);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 11px 16px;
+  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--grey-100);
+}
+
+button:disabled {
+  color: var(--grey-300);
+  cursor: default;
+}
+
+button.primary {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+  font-weight: 650;
+  padding: 14px 18px;
+  width: 100%;
+  font-size: 16px;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #c01a20;
+}
+
+button.danger {
+  color: var(--red);
+  border-color: var(--grey-300);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.row > * {
+  flex: 1;
+}
+
+/* ---------- header / timer ---------- */
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clock {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.clock.penalized {
+  color: var(--red);
+}
+
+.target {
+  font-size: 14px;
+  color: var(--grey-600);
+}
+
+.progress {
+  display: flex;
+  gap: 4px;
+}
+
+.pip {
+  height: 3px;
+  flex: 1;
+  background: var(--grey-300);
+  border-radius: 2px;
+}
+
+.pip.done {
+  background: var(--ink);
+}
+
+.pip.gaveup {
+  background: var(--red);
+}
+
+/* ---------- board ---------- */
+
+/* Keep the board and controls in the upper-middle of tall phone screens
+   instead of stranding a void below them. */
+.app.playing {
+  justify-content: center;
+  padding-bottom: 48px;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(2, var(--card-w));
+  grid-template-rows: repeat(2, var(--card-h));
+  gap: 14px;
+  justify-content: center;
+  padding: 8px 0 4px;
+  touch-action: none;
+}
+
+.slot {
+  width: var(--card-w);
+  height: var(--card-h);
+}
+
+.card {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--grey-300);
+  border-radius: var(--radius);
+  background: var(--paper);
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.card.dragging {
+  z-index: 20;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  border-color: var(--grey-600);
+}
+
+.card.armed {
+  border-color: var(--ink);
+}
+
+.card.derived {
+  background: var(--grey-100);
+  border-style: dashed;
+}
+
+.card .rank {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.card .rank.fraction {
+  font-size: 26px;
+}
+
+.card .corner {
+  position: absolute;
+  top: 7px;
+  left: 9px;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.card.red .rank,
+.card.red .corner {
+  color: var(--red-muted);
+}
+
+/* quadrant overlay shown on the drop target */
+
+.quadrants {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.quadrant {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--grey-600);
+  border: 1px solid var(--grey-300);
+  margin: -0.5px;
+}
+
+.quadrant.hot {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* ---------- panels ---------- */
+
+.panel {
+  border: 1px solid var(--grey-300);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel.flag {
+  border-left: 3px solid var(--red);
+}
+
+.expr {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  word-break: break-word;
+}
+
+.bigtime {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.scoreline {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--grey-100);
+}
+
+.scoreline:last-child {
+  border-bottom: 0;
+}
+
+.scoreline.win {
+  font-weight: 700;
+}
+
+/* per-hand splits */
+
+.splits {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.splitrow {
+  display: grid;
+  grid-template-columns: 16px 1fr 42px 38px;
+  align-items: center;
+  gap: 8px;
+}
+
+.splitrow .bar {
+  height: 8px;
+  background: var(--grey-100);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.splitrow .fill {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: 4px;
+}
+
+.splitrow .fill.gaveup {
+  background: var(--red);
+}
+
+.splitrow .behind {
+  color: var(--red);
+}
+
+input[type='text'] {
+  font: inherit;
+  padding: 11px 12px;
+  border: 1px solid var(--grey-300);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  width: 100%;
+}
+
+input[type='text']:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+  border-color: var(--ink);
+}
+
+.center {
+  text-align: center;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+@media (max-width: 380px) {
+  :root {
+    --card-w: 88px;
+    --card-h: 126px;
+  }
+}
