@@ -7,6 +7,7 @@ import type { Level } from './deck';
 import type { RunResult } from './challenge';
 
 const KEY_NAME = 'tf.name';
+const KEY_TUTORIAL = 'tf.tutorial';
 const KEY_BESTS = 'tf.bests';
 const KEY_HISTORY = 'tf.history';
 
@@ -29,6 +30,13 @@ function write(key: string, value: unknown): void {
 
 export const loadName = (): string => read<string>(KEY_NAME, '');
 export const saveName = (name: string): void => write(KEY_NAME, name.slice(0, 24));
+
+/**
+ * Whether the walkthrough has been seen. Absent means first visit, which is
+ * the only time it opens by itself; after that it lives behind "How to play".
+ */
+export const loadTutorialDone = (): boolean => read<boolean>(KEY_TUTORIAL, false);
+export const saveTutorialDone = (): void => write(KEY_TUTORIAL, true);
 
 type Bests = Record<string, number>;
 

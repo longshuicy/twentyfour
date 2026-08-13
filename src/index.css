@@ -195,6 +195,31 @@ button.danger {
   border-color: var(--grey-300);
 }
 
+/* Text-weight buttons: a way out of a screen that must not look like a way
+   into the game. */
+.link,
+.skip {
+  border: 0;
+  background: none;
+  color: var(--grey-600);
+  padding: 4px 2px;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link:hover:not(:disabled),
+.skip:hover:not(:disabled) {
+  background: none;
+  border: 0;
+  color: var(--ink);
+}
+
+.skip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .row {
   display: flex;
   gap: 8px;
@@ -244,6 +269,52 @@ button.danger {
   background: none;
   border: 0;
   color: var(--ink);
+}
+
+/* ---------- tutorial ---------- */
+
+/* The card to pick up breathes; the card to drop on holds a dashed outline.
+   Two different signals, because they are two different jobs. */
+.card.guide-from {
+  animation: guide-pulse 1.6s ease-in-out infinite;
+  border-color: var(--ink);
+}
+
+@keyframes guide-pulse {
+  50% {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.card.guide-to {
+  border-style: dashed;
+  border-color: var(--grey-600);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  text-align: center;
+}
+
+.step-count {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--grey-600);
+}
+
+.step-say {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.step-say strong {
+  font-weight: 700;
 }
 
 /* ---------- challenge link ---------- */
@@ -676,10 +747,24 @@ button.danger {
 }
 
 /* Above its neighbours so the wheel, which overflows this card, is not
-   painted under the adjacent ones. */
+   painted under the adjacent ones. The scale-up is not decoration: a bigger
+   armed card is a bigger thing to aim at, and it says which card you are
+   about to act on without reading anything. */
 .card.armed {
   border-color: var(--ink);
+  transform: scale(1.1);
   z-index: 15;
+}
+
+/* Everything that is not the source or the target recedes while dragging.
+   Sixteen corner indices competing with four spokes is a lot of ink at the
+   exact moment there are only two cards that matter. */
+.board.dragging .card:not(.armed):not(.lifted) {
+  opacity: 0.25;
+}
+
+.board.dragging .card:not(.armed):not(.lifted) .corner {
+  opacity: 0;
 }
 
 .card.derived {
@@ -783,9 +868,9 @@ button.danger {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(var(--card-w) * 0.62);
-  height: calc(var(--card-w) * 0.62);
-  margin: calc(var(--card-w) * -0.31) 0 0 calc(var(--card-w) * -0.31);
+  width: calc(var(--card-w) * 0.74);
+  height: calc(var(--card-w) * 0.74);
+  margin: calc(var(--card-w) * -0.37) 0 0 calc(var(--card-w) * -0.37);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -818,6 +903,12 @@ button.danger {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--paper);
+}
+
+/* Tutorial: the ops that are not the one being taught stay visible, so the
+   choice is still legible, but clearly are not what to press. */
+.wheel .spoke.off {
+  opacity: 0.25;
 }
 
 .wheel .spoke.up.hot {

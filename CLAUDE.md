@@ -54,7 +54,8 @@ src/lib/challenge.ts  URL-fragment encode/decode
 src/lib/storage.ts    localStorage (name, bests, history)
 src/lib/sound.ts      three cue clips + mute toggle, all failing soft
 src/assets/*.mp3      long wait / give up / succeed clips
-src/components/       Board (pointer-event drag), CardFace, Icons (inline SVG)
+src/components/       Board (pointer-event drag), CardFace, Header, Icons,
+                      Tutorial (guided first hand)
 src/App.tsx           screens: home / intro / play / done
 ```
 
@@ -88,6 +89,13 @@ src/App.tsx           screens: home / intro / play / done
 - A running CSS animation outranks the inline transform the drag writes, so any
   card-level animation must exclude `.dragging` and `.armed`, or dragging stops
   following the pointer.
+- **Keep the pointer position out of React state.** It lives in a ref, is
+  written straight to the proxy's transform, and moves are coalesced into one
+  rAF. Slot rects are measured once per drag, never per move. Re-rendering the
+  board on every pointer event is what made the drag feel sticky.
+- **`pointerup` must resolve the drop synchronously** from the last pointer
+  position, not from the last frame's result: a fast flick, or a backgrounded
+  tab, can end a drag before any frame runs.
 - Pointer events for drag. No HTML5 drag-and-drop, no DnD library. The drop
   target's op picker is a radial wheel that overflows the card (so a finger
   can't cover the choices); its selection is by *direction* from the card's

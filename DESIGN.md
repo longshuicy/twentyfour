@@ -387,12 +387,81 @@ inline transform the drag writes, so any card-level animation has to exclude
   minute, `2:23.1` above it. A bare number says nothing, and `2:23.1s` is an
   `s` stapled to a clock reading.
 
+### Aiming should be forgiving
+
+Three things widen the target, because precision is not the skill this game is
+testing:
+
+- **The nearest card within reach arms, not only a card the pointer is inside.**
+  Releasing in the gap between two cards used to do nothing at all.
+- **An armed card scales up**, which makes it both a larger thing to hit and an
+  unmistakable statement of what you are about to act on.
+- **The op is chosen by direction**, so each choice owns a 90 degree sector
+  rather than a small circle, and the armed target stays armed well outside its
+  own bounds.
+
 ### Implementation note
 
 Use **pointer events** (`pointerdown` / `pointermove` / `pointerup` +
 `setPointerCapture`), not HTML5 drag-and-drop (miserable on touch) and not a
-DnD library (overkill for four targets). ~80 lines, identical behavior on
-mouse and touch, full control over wheel hit-testing.
+DnD library (overkill for four targets). Identical behavior on mouse and touch,
+full control over wheel hit-testing.
+
+Three rules keep the drag smooth, and they are the reason `Board.tsx` looks the
+way it does:
+
+1. **The pointer position never enters React state.** It lives in a ref and is
+   written straight to the proxy's transform. Only `targetId` and `sector` are
+   state, and those change a few times per drag instead of on every event. The
+   first version re-rendered the entire board, sixteen corner indices included,
+   on every pointer move.
+2. **Slot rectangles are measured once per drag.** `getBoundingClientRect()`
+   per move forces a synchronous layout four times an event, which is exactly
+   what makes a drag feel like it is catching up with the finger. Slots cannot
+   move mid-drag, so one measurement at `pointerdown` is enough.
+3. **Moves are coalesced into one `requestAnimationFrame` callback**, since
+   pointer events outpace frames on trackpads and 120Hz screens.
+
+One trap worth knowing about, found the hard way: with the visual work deferred
+to a frame, `pointerup` must resolve the drop **synchronously from the last
+pointer position** rather than trusting what the last frame recorded. A quick
+flick can go down, move and release inside a single frame, and a drag in a
+backgrounded tab gets no frames at all. In both cases the queued work never
+ran, and the drop silently did nothing.
+
+### Quieting the board during a drag
+
+While dragging, every card that is neither source nor target drops to 25%
+opacity and loses its corner indices. Sixteen small glyphs competing with four
+spokes is a lot of ink at the exact moment only two cards matter.
+
+---
+
+## 5b. Teaching the game
+
+The drag is the one thing nobody can guess, so it gets a **guided first hand**
+rather than a paragraph or an animated demo. You learn a gesture by making it.
+
+It is the real board with the real drag; the only addition is a constraint.
+`Board` takes an optional `guide` naming the one legal move, and while it is
+set: only that card can be picked up, only that card can be armed, and the
+three ops that are not the answer are dimmed. The card to lift breathes, the
+card to drop on is outlined. There is no clock, no penalty, and no way to get
+it wrong.
+
+The deal is hand-picked rather than dealt: **8, 4, 2, 3**, solved as
+`8 − 4 = 4`, `4 × 2 = 8`, `8 × 3 = 24`. Every step is a plain operation with a
+whole-number result, and each result is immediately the thing you drag next,
+which is the idea that takes longest to land: a combined card is just a card.
+
+Three rules around it:
+
+- **Skippable from the first frame.** "Skip, I know how" sits next to the
+  heading, not at the bottom.
+- **Shown once**, on a first visit, tracked by `tf.tutorial` in localStorage,
+  and afterwards reachable any time from "How to play" on the home screen.
+- **Never shown to someone arriving on a challenge link.** They were sent a
+  race; give them the race.
 
 ---
 

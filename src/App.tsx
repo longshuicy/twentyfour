@@ -26,12 +26,16 @@ import {
   loadName,
   loadRecentRuns,
   loadRecords,
+  loadTutorialDone,
   saveBest,
   saveHistoryEntry,
   saveName,
+  saveTutorialDone,
 } from './lib/storage';
 import { isMuted, play, primeSounds, setMuted } from './lib/sound';
 import { SoundOffIcon, SoundOnIcon } from './components/Icons';
+import { Header } from './components/Header';
+import { Tutorial } from './components/Tutorial';
 
 /* Two minutes. At 30s a give-up was cheaper than thinking hard about a bad
    hand, which made it the efficient play and hollowed out the whole run. */
@@ -65,7 +69,7 @@ function praiseFor(
   return null;
 }
 
-type Screen = 'home' | 'intro' | 'play' | 'done' | 'record';
+type Screen = 'home' | 'intro' | 'play' | 'done' | 'record' | 'tutorial';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -97,6 +101,15 @@ export default function App() {
 
   const linkRef = useRef<HTMLInputElement>(null);
   const runStart = useRef(0);
+  /**
+   * When the clock stopped, while an answer is on screen.
+   *
+   * Giving up already costs GIVE_UP_PENALTY. Billing the seconds spent reading
+   * the answer on top of that is a second penalty nobody agreed to, and it
+   * punishes the player for actually studying the solution, which is the one
+   * useful thing a give-up buys.
+   */
+  const pausedAt = useRef<number | null>(null);
   const handStart = useRef(0);
   /** Hand index the long-wait nudge already fired for, so it fires once. */
   const nudgedFor = useRef(-1);
@@ -107,9 +120,13 @@ export default function App() {
   useEffect(() => {
     const found = readChallengeFromUrl();
     if (found) {
+      /* Someone who was sent a race wants the race. No walkthrough here, ever,
+         even on a first visit. */
       setIncoming(found);
       setScreen('intro');
+      return;
     }
+    if (!loadTutorialDone()) setScreen('tutorial');
   }, []);
 
   /* Ticking clock. Only runs while playing. */
@@ -119,8 +136,11 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [screen]);
 
-  const elapsed = screen === 'play' ? (now - runStart.current) / 1000 + penalty : 0;
-  const onThisHand = screen === 'play' ? (now - handStart.current) / 1000 : 0;
+  /* Every displayed time reads from this, so the clock freezes everywhere at
+     once while an answer is up: the run total and the hand's own timer. */
+  const clockNow = pausedAt.current ?? now;
+  const elapsed = screen === 'play' ? (clockNow - runStart.current) / 1000 + penalty : 0;
+  const onThisHand = screen === 'play' ? (clockNow - handStart.current) / 1000 : 0;
   const longWait = screen === 'play' && !revealed && onThisHand >= LONG_WAIT;
 
   /* An armed "Start over" disarms itself — leaving it hot for the rest of the
@@ -159,6 +179,7 @@ export default function App() {
     setConfirmRestart(false);
     setStreak(0);
     setPraise(null);
+    pausedAt.current = null;
     nudgedFor.current = -1;
     /* First gesture of the session — the only moment the browser will let us
        warm the audio decoder. */
@@ -180,6 +201,21 @@ export default function App() {
     if (!incoming) return;
     saveName(name);
     startRun(incoming.seed, incoming.level);
+  }
+
+  /**
+   * Restart the clock after an answer has been read.
+   *
+   * Both start marks move forward by however long the pause lasted, which is
+   * what keeps the paused stretch out of the run total AND out of this hand's
+   * split, without any of the arithmetic downstream knowing a pause happened.
+   */
+  function resumeClock() {
+    if (pausedAt.current === null) return;
+    const paused = performance.now() - pausedAt.current;
+    runStart.current += paused;
+    handStart.current += paused;
+    pausedAt.current = null;
   }
 
   function advance(spentSeconds: number) {
@@ -245,6 +281,7 @@ export default function App() {
     setGaveUpCount((g) => g + 1);
     setGaveUpHands((s) => new Set(s).add(handIndex));
     setStreak(0);
+    pausedAt.current = performance.now();
     play('giveUp');
     setShaking(true);
     window.setTimeout(() => setShaking(false), 500);
@@ -310,6 +347,9 @@ export default function App() {
           </button>
           <button onClick={() => startFresh('hard')}>Play hard · A–K · 13 hands</button>
         </div>
+        <button className="link" onClick={() => setScreen('tutorial')}>
+          How to play
+        </button>
         <RecordSummary name={name} onOpen={() => setScreen('record')} />
       </div>
     );
@@ -410,11 +450,14 @@ export default function App() {
           </div>
         ) : revealed ? (
           <div className="panel flag">
-            <span className="muted tiny">Answer</span>
+            <span className="muted tiny">Answer · clock paused, take your time</span>
             <span className="expr">{revealed}</span>
             <button
               className="primary"
-              onClick={() => advance((performance.now() - handStart.current) / 1000)}
+              onClick={() => {
+                resumeClock();
+                advance((performance.now() - handStart.current) / 1000);
+              }}
             >
               Next hand
             </button>
@@ -547,18 +590,22 @@ export default function App() {
     return <RecordScreen name={name} onBack={() => setScreen('home')} />;
   }
 
-  return <div className="app" />;
-}
+  if (screen === 'tutorial') {
+    return (
+      <Tutorial
+        onSkip={() => {
+          saveTutorialDone();
+          setScreen('home');
+        }}
+        onPlay={(level) => {
+          saveTutorialDone();
+          startFresh(level);
+        }}
+      />
+    );
+  }
 
-/** The banner. Deliberately loud: it is the only branding the app has, and it
-    is the one thing on the page allowed to shout. */
-function Header() {
-  return (
-    <div className="banner">
-      <h1>TwentyFour</h1>
-      <span className="tagline">four cards, one target</span>
-    </div>
-  );
+  return <div className="app" />;
 }
 
 /**
