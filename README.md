@@ -1,4 +1,6 @@
-# 24
+# TwentyFour
+
+**Play it: https://longshuicy.github.io/twentyfour/**
 
 Four cards. Use each one exactly once with `+ − × ÷` to make **24**. Clear the
 whole deck as fast as you can, then send a friend a link to race the identical
@@ -29,7 +31,7 @@ cards reported as leftover.
 
 Total elapsed time to clear the deck. Lower wins.
 
-- Give up → **+30s**, and the answer is shown. That's the only penalty; there
+- Give up → **+120s**, and the answer is shown. That's the only penalty; there
   are no hints.
 
 The result screen breaks the run down per hand, and when you're answering a

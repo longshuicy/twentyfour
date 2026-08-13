@@ -51,6 +51,20 @@ const inflate = (rect: DOMRect, by: number) => ({
   bottom: rect.bottom + by,
 });
 
+/** Flight time of the merging card. Kept in sync with the `fly` keyframes. */
+const MERGE_MS = 200;
+
+/** A card in flight from its old slot to the slot it merged into. */
+type Fly = {
+  key: string;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  label: string;
+  cls: string;
+};
+
 type Drag = {
   tileId: string;
   /** Viewport coordinates of the pointer, for placing the proxy. */
@@ -73,6 +87,7 @@ export function Board({
   mood?: 'won' | 'nudge' | null;
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [fly, setFly] = useState<Fly | null>(null);
   const slots = useRef(new Map<string, HTMLDivElement>());
   const dragged = drag ? hand.tiles.find((t) => t.id === drag.tileId) ?? null : null;
 
@@ -121,13 +136,40 @@ export function Board({
   function onPointerUp() {
     if (!drag) return;
     if (drag.targetId && drag.sector !== null) {
+      /* Launch the flyer BEFORE combining. The source tile is about to stop
+         existing, so its position has to be read while it still has one: the
+         flyer is the only thing carrying continuity between "two cards" and
+         "one card", which is what makes the merge read as a merge rather than
+         a card blinking out. */
+      const fromEl = slots.current.get(drag.tileId);
+      const toEl = slots.current.get(drag.targetId);
+      const tile = hand.tiles.find((t) => t.id === drag.tileId);
+      if (fromEl && toEl && tile) {
+        const a = fromEl.getBoundingClientRect();
+        const b = toEl.getBoundingClientRect();
+        setFly({
+          key: `${drag.tileId}->${drag.targetId}`,
+          fromX: a.left + a.width / 2,
+          fromY: a.top + a.height / 2,
+          toX: b.left + b.width / 2,
+          toY: b.top + b.height / 2,
+          label: tileLabel(tile),
+          cls: faceClass(tile),
+        });
+        window.setTimeout(() => setFly(null), MERGE_MS);
+      }
       onCombine(drag.tileId, drag.targetId, WHEEL[drag.sector].op);
     }
     setDrag(null);
   }
 
+  /* One tile left: the board collapses to a single centred cell, so the last
+     card is the only thing on screen rather than sitting in the top-left of a
+     2x2 grid with three holes beside it. */
+  const single = hand.tiles.length === 1 ? ' single' : '';
+
   return (
-    <div className={`board${mood ? ` ${mood}` : ''}`}>
+    <div className={`board${single}${mood ? ` ${mood}` : ''}`}>
       {hand.tiles.map((tile) => {
         const isDragging = drag?.tileId === tile.id;
         const isTarget = drag?.targetId === tile.id;
@@ -165,6 +207,26 @@ export function Board({
           </div>
         );
       })}
+
+      {/* The merging card, in flight to the slot it is being absorbed into.
+          Keyed so a second merge restarts the animation instead of resuming
+          the first one's. */}
+      {fly && (
+        <div
+          key={fly.key}
+          className={`flyer ${fly.cls}`}
+          style={
+            {
+              '--fx': `${fly.fromX}px`,
+              '--fy': `${fly.fromY}px`,
+              '--tx': `${fly.toX}px`,
+              '--ty': `${fly.toY}px`,
+            } as React.CSSProperties
+          }
+        >
+          <span className="rank mono">{fly.label}</span>
+        </div>
+      )}
 
       {/* The proxy: a small card pinned to the pointer, above everything.
           Just the value — corner indices at this size are unreadable specks,

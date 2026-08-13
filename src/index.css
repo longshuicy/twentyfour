@@ -352,15 +352,108 @@ button.danger {
    own — audio is muted, blocked by autoplay policy, or simply off far more
    often than not. Everything here is suppressed under reduced-motion. */
 
+/* The finale. One card, centred, grown, with a ring going out of it. The hold
+   is the point: the run is a stopwatch, and this is the only moment it stops
+   asking you for something. */
 .board.won .card {
-  animation: pop 420ms ease-out;
-  border-color: var(--ink);
+  animation: finale 900ms cubic-bezier(0.2, 1.1, 0.3, 1) forwards;
+  /* Solid, not the dashed outline every combined tile wears: this one is
+     finished, and it should stop looking like work in progress. */
+  border: 2px solid var(--ink);
+  background: var(--grey-100);
+  z-index: 5;
 }
 
-@keyframes pop {
-  40% {
-    transform: scale(1.09);
-    box-shadow: 0 0 0 3px rgba(242, 242, 242, 0.5);
+@keyframes finale {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.32);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+  100% {
+    transform: scale(1.26);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* The ring. A pseudo-element, so it costs no markup and cannot be dragged. */
+.board.won .card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  border: 2px solid var(--ink);
+  animation: ring 900ms ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+}
+
+/* A newly combined tile lands. Each combine mints a new tile id, so this
+   element is fresh and the animation runs exactly once, on mount. */
+.card.derived {
+  animation: land 240ms cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+@keyframes land {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.5;
+  }
+  60% {
+    transform: scale(1.07);
+  }
+}
+
+/* The card in flight, from its old slot to the one it merges into. */
+.flyer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  pointer-events: none;
+  width: var(--card-w);
+  height: var(--card-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--grey-600);
+  border-radius: var(--radius);
+  background: var(--card-face);
+  animation: fly 200ms ease-in forwards;
+}
+
+.flyer .rank {
+  font-size: calc(var(--card-w) * 0.36);
+}
+
+.flyer.red .rank {
+  color: var(--red-muted);
+}
+
+.flyer.derived {
+  background: var(--card-face-derived);
+}
+
+@keyframes fly {
+  from {
+    transform: translate3d(calc(var(--fx) - 50%), calc(var(--fy) - 50%), 0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(calc(var(--tx) - 50%), calc(var(--ty) - 50%), 0) scale(0.55);
+    opacity: 0;
   }
 }
 
@@ -392,6 +485,61 @@ button.danger {
     transform: translateY(-4px);
     border-color: var(--grey-600);
   }
+}
+
+/* The moment a hand falls: the time, what was good about it, and the streak
+   it belongs to. Occupies the controls' slot for the length of the beat. */
+.cheer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  animation: cheer-in 260ms ease-out;
+}
+
+.cheer-time {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.cheer-line {
+  font-size: 13px;
+  color: var(--grey-900);
+}
+
+.cheer-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grey-600);
+}
+
+.cheer-streak .pips {
+  letter-spacing: 0.18em;
+  color: var(--ink);
+}
+
+@keyframes cheer-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
+
+/* Running streak, beside the hand counter. Quiet until it is worth having. */
+.streak {
+  padding: 2px 7px;
+  border: 1px solid var(--grey-300);
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--grey-900);
 }
 
 .nudge-note {
@@ -439,6 +587,15 @@ button.danger {
   justify-content: center;
   padding: 8px 0 4px;
   touch-action: none;
+}
+
+.board.single {
+  grid-template-columns: var(--card-w);
+  grid-template-rows: var(--card-h);
+  /* The 2x2 board reserves two rows; keep that height so the controls below
+     do not jump up when the last two cards become one. */
+  min-height: calc(var(--card-h) * 2 + 14px);
+  align-content: center;
 }
 
 .slot {

@@ -113,7 +113,12 @@ balance, and it blurs the one clean decision the player has to make.
 **Score = total elapsed time to clear the deck. Lower is better.**
 
 - Timer starts on the first deal, stops when the last hand is solved.
-- Give up → **+30 s** penalty, answer revealed. This is the only penalty.
+- Give up → **+120 s** penalty, answer revealed. This is the only penalty.
+
+The penalty started at 30 s and was raised to two minutes, because 30 s was
+cheaper than thinking hard about a bad hand. When quitting is the efficient
+play, a run stops being a test of anything: the price has to exceed what a
+stubborn hand actually costs you.
 
 Per-hand points were considered and rejected: they feel good moment-to-moment
 but make cross-player comparison mushy, and comparison is the whole point of
@@ -324,7 +329,34 @@ visual cue and one short clip:
 | --- | --- | --- |
 | 30s on one hand | board breathes, staggered; a line appears naming the elapsed time and the give-up price | `long_wait_meow` |
 | Give up | the screen shakes once | `dog_giveup_woof` |
-| Made 24 | the cards pop and outline in white, held for 750ms before the next deal | `succeed_meow` |
+| Made 24 | see below | `succeed_meow` |
+
+### The success moment
+
+This one carries the most weight and got the most attention. The first version
+was a 420ms pop that fired identically whether you solved a hand in three
+seconds or ninety: it rewarded the event, not the achievement. Four parts now:
+
+1. **The merge is a motion, not a state change.** On a combine, a flyer card
+   travels from the source slot into the target slot while the result lands
+   with a short overshoot. Two cards visibly become one, instead of one
+   blinking out of existence.
+2. **The last card takes the stage.** With one tile left the board collapses to
+   a single centred cell (holding its old height so the controls below do not
+   jump), and on 24 that card grows, turns solid instead of the dashed outline
+   every in-progress tile wears, and throws a white ring outward.
+3. **The beat names the achievement.** Under the card: the hand's time, and the
+   most concrete true thing available about it, in priority order — beating the
+   person who sent you the deck on this hand, then your fastest hand yet, then
+   under your average. When none is true it says nothing rather than inventing
+   praise. Specific beats loud.
+4. **Streaks.** Consecutive hands solved without giving up, shown climbing in
+   the beat and carried in a small badge beside the hand counter. This gives
+   the give-up penalty a second cost beyond seconds and turns hand 9 of 13 into
+   something you are protecting.
+
+The hold is 1400ms, long enough to read two lines and short enough that a
+player chasing a clock does not feel detained.
 
 **The visual carries the meaning; the sound is a bonus.** Audio is muted,
 blocked by autoplay policy until the first gesture, or simply off far more

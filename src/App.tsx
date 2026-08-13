@@ -33,10 +33,37 @@ import {
 import { isMuted, play, primeSounds, setMuted } from './lib/sound';
 import { SoundOffIcon, SoundOnIcon } from './components/Icons';
 
-const GIVE_UP_PENALTY = 30;
+/* Two minutes. At 30s a give-up was cheaper than thinking hard about a bad
+   hand, which made it the efficient play and hollowed out the whole run. */
+const GIVE_UP_PENALTY = 120;
 
 /** Seconds on a single hand before the board nudges you. */
 const LONG_WAIT = 30;
+
+/**
+ * What to say about a hand the moment it is solved.
+ *
+ * Specific praise beats loud praise, so this reaches for the most concrete
+ * true thing available and says nothing at all rather than inventing one.
+ * Order matters: beating the person who sent you the deck outranks beating
+ * yourself, and beating your best outranks beating your average.
+ */
+function praiseFor(
+  seconds: number,
+  earlier: number[],
+  rival: RunResult | null,
+  handIndex: number,
+): string | null {
+  const theirs = rival?.splits[handIndex];
+  if (theirs !== undefined && seconds < theirs) {
+    return `${round1(theirs - seconds)}s faster than ${rival?.name} on this hand`;
+  }
+  if (earlier.length === 0) return 'first one down';
+  if (seconds < Math.min(...earlier)) return 'fastest hand yet';
+  const average = earlier.reduce((sum, s) => sum + s, 0) / earlier.length;
+  if (seconds < average) return 'under your average';
+  return null;
+}
 
 type Screen = 'home' | 'intro' | 'play' | 'done' | 'record';
 
@@ -64,6 +91,9 @@ export default function App() {
   const [muted, setMutedState] = useState(isMuted);
   /** Second tap arms "Start over", which discards the run in progress. */
   const [confirmRestart, setConfirmRestart] = useState(false);
+  /** Hands solved in a row without giving up. Reset by a give-up, not by time. */
+  const [streak, setStreak] = useState(0);
+  const [praise, setPraise] = useState<{ seconds: number; line: string | null } | null>(null);
 
   const linkRef = useRef<HTMLInputElement>(null);
   const runStart = useRef(0);
@@ -127,6 +157,8 @@ export default function App() {
     setCelebrating(false);
     setShaking(false);
     setConfirmRestart(false);
+    setStreak(0);
+    setPraise(null);
     nudgedFor.current = -1;
     /* First gesture of the session — the only moment the browser will let us
        warm the audio decoder. */
@@ -159,6 +191,7 @@ export default function App() {
     setSplits(nextSplits);
     setRevealed(null);
     setCelebrating(false);
+    setPraise(null);
 
     const next = handIndex + 1;
     if (next >= deck.hands.length) {
@@ -192,11 +225,14 @@ export default function App() {
     const next = applyOp(hand, draggedId, targetId, op);
     setHand(next);
     if (isSolved(next)) {
-      // Small beat so the player sees the 24 before the next deal.
       const spent = (performance.now() - handStart.current) / 1000;
+      setStreak((s) => s + 1);
+      setPraise({ seconds: round1(spent), line: praiseFor(spent, splits, target, handIndex) });
       setCelebrating(true);
       play('succeed');
-      window.setTimeout(() => advance(spent), 750);
+      /* Long enough to read the time and the line under it, short enough that
+         a player chasing a clock does not feel held. */
+      window.setTimeout(() => advance(spent), 1400);
     }
   }
 
@@ -208,6 +244,7 @@ export default function App() {
     setPenalty((p) => p + GIVE_UP_PENALTY);
     setGaveUpCount((g) => g + 1);
     setGaveUpHands((s) => new Set(s).add(handIndex));
+    setStreak(0);
     play('giveUp');
     setShaking(true);
     window.setTimeout(() => setShaking(false), 500);
@@ -327,6 +364,7 @@ export default function App() {
             {formatTime(elapsed)}
           </span>
           <span className="target mono">
+            {streak >= 2 && !celebrating && <span className="streak">{streak} in a row</span>}
             {target ? `vs ${formatTime(target.time)}` : `hand ${handIndex + 1}/${deck.hands.length}`}
             <button
               className="mute"
@@ -357,7 +395,20 @@ export default function App() {
           mood={celebrating ? 'won' : longWait ? 'nudge' : null}
         />
 
-        {revealed ? (
+        {/* The celebration takes the controls' place rather than appearing
+            below them: same space, no reflow, and there is nothing to press
+            during the beat anyway. */}
+        {celebrating && praise ? (
+          <div className="cheer">
+            <span className="cheer-time mono">{formatTime(praise.seconds)}</span>
+            {praise.line && <span className="cheer-line">{praise.line}</span>}
+            {streak >= 2 && (
+              <span className="cheer-streak">
+                {streak} in a row<span className="pips">{'•'.repeat(Math.min(streak, 8))}</span>
+              </span>
+            )}
+          </div>
+        ) : revealed ? (
           <div className="panel flag">
             <span className="muted tiny">Answer</span>
             <span className="expr">{revealed}</span>

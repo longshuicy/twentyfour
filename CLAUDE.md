@@ -107,7 +107,7 @@ every-card-used-exactly-once.
 
 Do not add these back without being asked:
 
-- **Hints.** Give up (+30s, shows the answer) is the only assist.
+- **Hints.** Give up (+120s, shows the answer) is the only assist.
 - **A daily puzzle.**
 - **A global leaderboard** or any server, database, or hosted service.
 - **New runtime dependencies**, including a drag-and-drop library.
