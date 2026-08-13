@@ -499,6 +499,47 @@ yours to do. If the clipboard write is refused (denied permission, insecure
 origin) the field selects itself instead, so the player can copy by hand rather
 than being told it worked when it did not.
 
+### More than two players: a relay, not a hub
+
+Finishing appends your result to whatever the link already carried, so the
+table grows only when a link is passed **along**:
+
+```
+You --[you]--> Bea --[you, Bea]--> Carl --[you, Bea, Carl]--> Dana
+```
+
+Sending the *same* link to three people does not build a four-person table. It
+builds three separate two-person branches, and nobody ever sees all four,
+because there is no server on which to merge them. Everyone's screen shows
+exactly the history in the link they were handed. That is the honest
+consequence of the no-backend model, and it is worth stating rather than
+hiding.
+
+**Who is the challenger.** The sender is the player who finished **last** and
+appended themselves, not the fastest player in the list. Naming the fastest was
+a bug: a link forwarded by a slower player announced somebody else entirely,
+and the recipient could not tell who was actually challenging them. The intro
+screen names the sender, shows the field sorted fastest first, and marks which
+row sent it.
+
+**URL budget.** Each player costs about 108 characters on hard and 84 on easy,
+of which roughly 80% is their splits array.
+
+| Players | URL length |
+| --- | --- |
+| 3 | 409 |
+| 10 | 1,165 |
+| 20 | 2,258 |
+| 50 | 5,538 |
+
+The payload lives in the fragment, which browsers never transmit, so server
+request-line limits do not apply at all. Browsers themselves are irrelevant
+until thousands of players. The real ceiling is what chat clients and link
+previews tolerate, traditionally ~2,000 characters, which is about 18 players
+on hard. If that ever binds, keep full splits only for the fastest rival and
+store name, time and gave-up count for everyone else: that drops the per-player
+cost to about 25 characters.
+
 ### Receiving — before the first card
 
 ```

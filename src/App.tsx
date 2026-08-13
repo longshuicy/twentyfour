@@ -356,8 +356,18 @@ export default function App() {
   }
 
   if (screen === 'intro' && incoming) {
-    const challenger = target?.name ?? 'Someone';
+    /* The person who SENT this is the one who finished last and appended
+       themselves, not the fastest one in the list. Naming the fastest meant a
+       link forwarded by a slower player announced somebody else entirely, and
+       whoever opened it could not tell who was actually challenging them. */
+    const sender = incoming.results[incoming.results.length - 1] ?? null;
+    const challenger = sender?.name ?? 'Someone';
     const preview = buildDeck(incoming.seed, incoming.level);
+    /* Everyone already on this deck, fastest first. A chain can be several
+       people long, and arriving at it you should see the whole field rather
+       than one number. */
+    const standings = [...incoming.results].sort((a, b) => a.time - b.time);
+    const senderIsFastest = sender !== null && target !== null && sender.time === target.time;
     return (
       <div className="app">
         <Header />
@@ -369,9 +379,27 @@ export default function App() {
           {target && (
             <p className="mono" style={{ margin: 0, fontSize: 15 }}>
               time to beat <strong>{formatTime(target.time)}</strong>
+              {!senderIsFastest && <span className="muted"> · {target.name} leads</span>}
             </p>
           )}
         </div>
+
+        {standings.length > 1 && (
+          <div className="panel">
+            <span className="muted tiny">
+              {standings.length} have played this deck, fastest first
+            </span>
+            {standings.map((r, i) => (
+              <div key={`${r.name}-${i}`} className={`scoreline${i === 0 ? ' win' : ''}`}>
+                <span>
+                  {r.name}
+                  {r === sender && <span className="muted tiny"> · sent you this</span>}
+                </span>
+                <span className="mono">{formatTime(r.time)}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           placeholder="Your name"
