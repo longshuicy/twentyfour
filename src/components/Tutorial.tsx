@@ -3,6 +3,7 @@ import { Board, type Guide } from './Board';
 import { Header } from './Header';
 import type { Card, Level } from '../lib/deck';
 import { applyOp, initHand, type HandState } from '../lib/hand';
+import { useLang } from '../lib/i18n';
 
 /**
  * A guided first hand.
@@ -30,41 +31,13 @@ const CARDS: Card[] = [
 ];
 
 /* Tile ids are `${draggedId}${op}${targetId}` (see hand.ts), so the id of each
-   result is known ahead of time and the steps can name it directly. */
-const STEPS: (Guide & { say: React.ReactNode })[] = [
-  {
-    fromId: 'S8',
-    toId: 'H4',
-    op: '-',
-    say: (
-      <>
-        Drag the <strong>8</strong> onto the <strong>4</strong>, then let go on{' '}
-        <strong>−</strong>.
-      </>
-    ),
-  },
-  {
-    fromId: 'S8-H4',
-    toId: 'C2',
-    op: '*',
-    say: (
-      <>
-        The two cards became one. That <strong>4</strong> is a card now: drag it onto the{' '}
-        <strong>2</strong> and let go on <strong>×</strong>.
-      </>
-    ),
-  },
-  {
-    fromId: 'S8-H4*C2',
-    toId: 'D3',
-    op: '*',
-    say: (
-      <>
-        Last one. Drag the <strong>8</strong> onto the <strong>3</strong> and let go on{' '}
-        <strong>×</strong>.
-      </>
-    ),
-  },
+   result is known ahead of time and the steps can name it directly. The
+   spoken line for each step lives in the translation dict (`tutorialStep1..3`)
+   since it is the one piece of this that has to change per language. */
+const STEPS: Guide[] = [
+  { fromId: 'S8', toId: 'H4', op: '-' },
+  { fromId: 'S8-H4', toId: 'C2', op: '*' },
+  { fromId: 'S8-H4*C2', toId: 'D3', op: '*' },
 ];
 
 export function Tutorial({
@@ -75,11 +48,13 @@ export function Tutorial({
   onSkip: () => void;
   onPlay: (level: Level) => void;
 }) {
+  const { t } = useLang();
   const [hand, setHand] = useState<HandState>(() => initHand(CARDS));
   const [step, setStep] = useState(0);
 
   const done = step >= STEPS.length;
   const guide = done ? null : STEPS[step];
+  const says = [t.tutorialStep1, t.tutorialStep2, t.tutorialStep3];
 
   function handleCombine(draggedId: string, targetId: string, op: Parameters<typeof applyOp>[3]) {
     setHand((current) => applyOp(current, draggedId, targetId, op));
@@ -91,18 +66,17 @@ export function Tutorial({
       <Header />
 
       <div className="topbar">
-        <h2>{done ? 'That is the whole game' : 'How to play'}</h2>
+        <h2>{done ? t.thatIsWholeGame : t.howToPlayTitle}</h2>
         {!done && (
           <button className="skip" onClick={onSkip}>
-            Skip, I know how
+            {t.skipIKnowHow}
           </button>
         )}
       </div>
 
       {!done && (
         <p className="muted tiny" style={{ margin: 0 }}>
-          Four cards, each used exactly once, with + − × ÷ to make 24. Here is one worked
-          through.
+          {t.tutorialIntro}
         </p>
       )}
 
@@ -117,28 +91,24 @@ export function Tutorial({
       {done ? (
         <>
           <p className="tiny muted" style={{ margin: 0 }}>
-            A real deck is nine or thirteen hands of that, against the clock. Undo and Reset
-            cost nothing. Give up costs two minutes and shows you an answer, and every hand
-            has one.
+            {t.tutorialDone}
           </p>
           {/* Both levels, in the same order and wording as the home screen.
               Finishing the walkthrough should not quietly narrow the choice. */}
           <div className="stack">
             <button className="primary" onClick={() => onPlay('easy')}>
-              Play easy · A–9 · 9 hands
+              {t.playEasy}
             </button>
-            <button onClick={() => onPlay('hard')}>Play hard · A–K · 13 hands</button>
+            <button onClick={() => onPlay('hard')}>{t.playHard}</button>
           </div>
           <button className="link" onClick={onSkip}>
-            Back to the start
+            {t.backToStart}
           </button>
         </>
       ) : (
         <div className="step">
-          <span className="step-count">
-            step {step + 1} of {STEPS.length}
-          </span>
-          <span className="step-say">{guide?.say}</span>
+          <span className="step-count">{t.stepOf(step + 1, STEPS.length)}</span>
+          <span className="step-say">{says[step]}</span>
         </div>
       )}
     </div>

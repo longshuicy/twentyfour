@@ -36,6 +36,7 @@ import { isMuted, play, primeSounds, setMuted } from './lib/sound';
 import { SoundOffIcon, SoundOnIcon } from './components/Icons';
 import { Header } from './components/Header';
 import { Tutorial } from './components/Tutorial';
+import { useLang, type Dict } from './lib/i18n';
 
 /* Two minutes. At 30s a give-up was cheaper than thinking hard about a bad
    hand, which made it the efficient play and hollowed out the whole run. */
@@ -57,21 +58,23 @@ function praiseFor(
   earlier: number[],
   rival: RunResult | null,
   handIndex: number,
+  t: Dict,
 ): string | null {
   const theirs = rival?.splits[handIndex];
   if (theirs !== undefined && seconds < theirs) {
-    return `${round1(theirs - seconds)}s faster than ${rival?.name} on this hand`;
+    return t.faster(String(round1(theirs - seconds)), rival?.name ?? '');
   }
-  if (earlier.length === 0) return 'first one down';
-  if (seconds < Math.min(...earlier)) return 'fastest hand yet';
+  if (earlier.length === 0) return t.firstOneDown;
+  if (seconds < Math.min(...earlier)) return t.fastestHandYet;
   const average = earlier.reduce((sum, s) => sum + s, 0) / earlier.length;
-  if (seconds < average) return 'under your average';
+  if (seconds < average) return t.underAverage;
   return null;
 }
 
 type Screen = 'home' | 'intro' | 'play' | 'done' | 'record' | 'tutorial';
 
 export default function App() {
+  const { t } = useLang();
   const [screen, setScreen] = useState<Screen>('home');
   const [name, setName] = useState(loadName());
   const [incoming, setIncoming] = useState<Challenge | null>(null);
@@ -268,7 +271,7 @@ export default function App() {
     if (isSolved(next)) {
       const spent = (performance.now() - handStart.current) / 1000;
       setStreak((s) => s + 1);
-      setPraise({ seconds: round1(spent), line: praiseFor(spent, splits, target, handIndex) });
+      setPraise({ seconds: round1(spent), line: praiseFor(spent, splits, target, handIndex, t) });
       setCelebrating(true);
       play('succeed');
       /* Long enough to read the time and the line under it, short enough that
@@ -281,7 +284,7 @@ export default function App() {
     if (!deck || !hand) return;
     const cards = deck.hands[handIndex].cards.map((c) => c.value);
     const best = findBestSolution(cards);
-    setRevealed(best ? `${exprToString(best)} = 24` : 'No solution exists.');
+    setRevealed(best ? `${exprToString(best)} = 24` : t.noSolution);
     setPenalty((p) => p + GIVE_UP_PENALTY);
     setGaveUpCount((g) => g + 1);
     setGaveUpHands((s) => new Set(s).add(handIndex));
@@ -323,23 +326,13 @@ export default function App() {
         <Header />
         {/* Quiet on purpose: the banner is the loud thing on this screen. */}
         <div className="howto">
-          <p>
-            Four cards. Use each one exactly once with + − × ÷ to make 24. Clear the deck as
-            fast as you can.
-          </p>
-          <p>
-            Drag a card onto another and a wheel of + − × ÷ appears, then let go on the one
-            you want. The two become one card holding the result. The dragged card goes on
-            the left, so 7 onto 3 is 7 − 3.
-          </p>
-          <p>
-            Undo and Reset are free. Give up costs {GIVE_UP_PENALTY}s and shows an answer:
-            every hand has one.
-          </p>
+          <p>{t.howtoIntro}</p>
+          <p>{t.howtoDrag}</p>
+          <p>{t.howtoFree(GIVE_UP_PENALTY)}</p>
         </div>
         <input
           type="text"
-          placeholder="Your name"
+          placeholder={t.namePlaceholder}
           value={name}
           maxLength={24}
           onChange={(e) => setName(e.target.value)}
@@ -348,12 +341,12 @@ export default function App() {
             actually finish, and hard is one tap away for those who want it. */}
         <div className="stack">
           <button className="primary" onClick={() => startFresh('easy')}>
-            Play easy · A–9 · 9 hands
+            {t.playEasy}
           </button>
-          <button onClick={() => startFresh('hard')}>Play hard · A–K · 13 hands</button>
+          <button onClick={() => startFresh('hard')}>{t.playHard}</button>
         </div>
         <button className="link" onClick={() => setScreen('tutorial')}>
-          How to play
+          {t.howToPlay}
         </button>
         <RecordSummary name={name} onOpen={() => setScreen('record')} />
       </div>
@@ -377,28 +370,31 @@ export default function App() {
       <div className="app">
         <Header />
         <div className="panel">
-          <h2>{challenger} challenged you</h2>
+          <h2>{t.challengedYou(challenger)}</h2>
           <p className="muted tiny" style={{ margin: 0 }}>
-            {incoming.level} · {preview.hands.length} hands · deck {incoming.seed}
+            {t.levelWord[incoming.level]} · {preview.hands.length} {t.hands} · {t.deck} {incoming.seed}
           </p>
           {target && (
             <p className="mono" style={{ margin: 0, fontSize: 15 }}>
-              time to beat <strong>{formatTime(target.time)}</strong>
-              {!senderIsFastest && <span className="muted"> · {target.name} leads</span>}
+              {t.timeToBeat} <strong>{formatTime(target.time)}</strong>
+              {!senderIsFastest && (
+                <span className="muted">
+                  {' '}
+                  · {target.name} {t.leads}
+                </span>
+              )}
             </p>
           )}
         </div>
 
         {standings.length > 1 && (
           <div className="panel">
-            <span className="muted tiny">
-              {standings.length} have played this deck, fastest first
-            </span>
+            <span className="muted tiny">{t.havePlayed(standings.length)}</span>
             {standings.map((r, i) => (
               <div key={`${r.name}-${i}`} className={`scoreline${i === 0 ? ' win' : ''}`}>
                 <span>
                   {r.name}
-                  {r === sender && <span className="muted tiny"> · sent you this</span>}
+                  {r === sender && <span className="muted tiny"> · {t.sentYouThis}</span>}
                 </span>
                 <span className="mono">{formatTime(r.time)}</span>
               </div>
@@ -407,13 +403,13 @@ export default function App() {
         )}
         <input
           type="text"
-          placeholder="Your name"
+          placeholder={t.namePlaceholder}
           value={name}
           maxLength={24}
           onChange={(e) => setName(e.target.value)}
         />
         <button className="primary" onClick={acceptChallenge}>
-          Start
+          {t.start}
         </button>
         <button
           onClick={() => {
@@ -422,7 +418,7 @@ export default function App() {
             setScreen('home');
           }}
         >
-          Play my own deck instead
+          {t.playOwnDeck}
         </button>
       </div>
     );
@@ -437,13 +433,17 @@ export default function App() {
             {formatTime(elapsed)}
           </span>
           <span className="target mono">
-            {streak >= 2 && !celebrating && <span className="streak">{streak} in a row</span>}
-            {target ? `vs ${formatTime(target.time)}` : `hand ${handIndex + 1}/${deck.hands.length}`}
+            {streak >= 2 && !celebrating && (
+              <span className="streak">
+                {streak} {t.inARow}
+              </span>
+            )}
+            {target ? t.vs(formatTime(target.time)) : t.handOf(handIndex + 1, deck.hands.length)}
             <button
               className="mute"
               onClick={toggleMute}
-              aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
-              title={muted ? 'Unmute sounds' : 'Mute sounds'}
+              aria-label={muted ? t.unmuteSounds : t.muteSounds}
+              title={muted ? t.unmuteSounds : t.muteSounds}
             >
               {muted ? <SoundOffIcon /> : <SoundOnIcon />}
             </button>
@@ -487,7 +487,7 @@ export default function App() {
           </div>
         ) : revealed ? (
           <div className="panel flag">
-            <span className="muted tiny">Answer · clock paused, take your time</span>
+            <span className="muted tiny">{t.answerPaused}</span>
             <span className="expr">{revealed}</span>
             <button
               className="primary"
@@ -496,32 +496,31 @@ export default function App() {
                 advance((performance.now() - handStart.current) / 1000);
               }}
             >
-              Next hand
+              {t.nextHand}
             </button>
           </div>
         ) : (
           <>
             {dead ? (
               <p className="tiny muted center" style={{ margin: 0 }}>
-                Not 24. Undo or reset.
+                {t.notDeadEnd}
               </p>
             ) : (
               longWait && (
                 <p className="tiny center nudge-note" style={{ margin: 0 }}>
-                  {Math.floor(onThisHand)}s on this hand. There is an answer, or take the +
-                  {GIVE_UP_PENALTY}s and see it.
+                  {t.nudgeNote(Math.floor(onThisHand), GIVE_UP_PENALTY)}
                 </p>
               )
             )}
             <div className="row">
               <button disabled={!canUndo(hand)} onClick={() => setHand(undo(hand))}>
-                Undo
+                {t.undo}
               </button>
               <button
                 disabled={!canUndo(hand)}
                 onClick={() => setHand(initHand(deck.hands[handIndex].cards))}
               >
-                Reset
+                {t.reset}
               </button>
               {/* Undo and Reset are free and instant; this one throws away the
                   whole run, so it asks once before doing it. */}
@@ -532,11 +531,11 @@ export default function App() {
                   else setConfirmRestart(true);
                 }}
               >
-                {confirmRestart ? 'Sure?' : 'Start over'}
+                {confirmRestart ? t.sure : t.startOver}
               </button>
             </div>
             <button className="danger" onClick={giveUp}>
-              Give up +{GIVE_UP_PENALTY}s
+              {t.giveUp(GIVE_UP_PENALTY)}
             </button>
           </>
         )}
@@ -556,11 +555,11 @@ export default function App() {
         <div>
           <div className="bigtime mono">{formatTime(mine.time)}</div>
           <p className="muted tiny" style={{ marginTop: 6 }}>
-            {deck.level} · {deck.hands.length} hands
-            {mine.gaveUp > 0 && ` · ${mine.gaveUp} gave up`}
-            {deck.leftover.length > 0 && ` · ${deck.leftover.length} cards left over`}
+            {t.levelWord[deck.level]} · {deck.hands.length} {t.hands}
+            {mine.gaveUp > 0 && ` · ${t.gaveUp(mine.gaveUp)}`}
+            {deck.leftover.length > 0 && ` · ${t.cardsLeftOver(deck.leftover.length)}`}
             {personalBest !== null && personalBest < mine.time && (
-              <> · best {formatTime(personalBest)}</>
+              <> · {t.best(formatTime(personalBest))}</>
             )}
           </p>
         </div>
@@ -583,7 +582,7 @@ export default function App() {
             obvious that copying is all that happens and the sending is yours
             to do. */}
         <div className="panel">
-          <span className="muted tiny">Your challenge link</span>
+          <span className="muted tiny">{t.yourChallengeLink}</span>
           <div className="linkrow">
             <input
               type="text"
@@ -595,19 +594,16 @@ export default function App() {
               aria-label="Challenge link"
             />
             <button className="primary" onClick={() => copyLink(challengeUrl)}>
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? t.copied : t.copy}
             </button>
           </div>
           <span className="tiny muted">
-            Send it to someone yourself, in a message or an email. Whoever opens it
-            plays the exact same {deck.hands.length} hands, in the same order, racing your{' '}
-            {formatTime(mine.time)}. When they finish they see who won, and they get a link
-            back to you with both times in it.
+            {t.sendItYourself(deck.hands.length, formatTime(mine.time))}
           </span>
         </div>
 
         <div className="row" style={{ marginTop: 8 }}>
-          <button onClick={() => startRun(deck.seed, deck.level)}>Replay deck</button>
+          <button onClick={() => startRun(deck.seed, deck.level)}>{t.replayDeck}</button>
           <button
             onClick={() => {
               setIncoming(null);
@@ -615,7 +611,7 @@ export default function App() {
               setScreen('home');
             }}
           >
-            New deck
+            {t.newDeck}
           </button>
         </div>
         <RecordSummary name={name} onOpen={() => setScreen('record')} />
@@ -659,13 +655,14 @@ function Splits({
   others: RunResult[];
   gaveUpHands: Set<number>;
 }) {
+  const { t } = useLang();
   if (mine.splits.length === 0) return null;
   const rival = others.length > 0 ? others.reduce((a, b) => (a.time <= b.time ? a : b)) : null;
   const slowest = Math.max(...mine.splits);
 
   return (
     <div className="panel">
-      <span className="muted tiny">Per hand</span>
+      <span className="muted tiny">{t.perHand}</span>
       <div className="splits">
         {mine.splits.map((seconds, i) => {
           const theirs = rival?.splits[i];
@@ -690,15 +687,11 @@ function Splits({
         })}
       </div>
       {gaveUpHands.size > 0 && (
-        <span className="tiny muted">
-          Red bars are hands you gave up. The +{GIVE_UP_PENALTY}s penalty is included.
-        </span>
+        <span className="tiny muted">{t.redBarsGaveUp(GIVE_UP_PENALTY)}</span>
       )}
     </div>
   );
 }
-
-const LEVEL_LABEL: Record<Level, string> = { easy: 'Easy · A–9', hard: 'Hard · A–K' };
 
 const formatDay = (at: number): string =>
   new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -709,6 +702,7 @@ const formatDay = (at: number): string =>
  * bests, run history, head-to-head — with no screen that ever displayed it.
  */
 function RecordSummary({ name, onOpen }: { name: string; onOpen: () => void }) {
+  const { t } = useLang();
   const records = useMemo(loadRecords, []);
   const h2h = useMemo(() => headToHead(name.trim() || 'Player'), [name]);
   const played = records.reduce((sum, r) => sum + r.runs, 0);
@@ -719,7 +713,7 @@ function RecordSummary({ name, onOpen }: { name: string; onOpen: () => void }) {
       <span className="tiny">
         {records
           .filter((r) => r.best !== null)
-          .map((r) => `${r.level} best ${formatTime(r.best as number)}`)
+          .map((r) => `${t.levelWord[r.level]} ${t.best(formatTime(r.best as number))}`)
           .join(' · ')}
         {h2h.wins + h2h.losses + h2h.ties > 0 && (
           <>
@@ -728,13 +722,14 @@ function RecordSummary({ name, onOpen }: { name: string; onOpen: () => void }) {
           </>
         )}
       </span>
-      <span className="tiny chev">Your record →</span>
+      <span className="tiny chev">{t.yourRecord}</span>
     </button>
   );
 }
 
 /** The full record: per-level bests and the recent runs behind them. */
 function RecordScreen({ name, onBack }: { name: string; onBack: () => void }) {
+  const { t } = useLang();
   const records = useMemo(loadRecords, []);
   const recent = useMemo(() => loadRecentRuns(10), []);
   const h2h = useMemo(() => headToHead(name.trim() || 'Player'), [name]);
@@ -743,49 +738,46 @@ function RecordScreen({ name, onBack }: { name: string; onBack: () => void }) {
   return (
     <div className="app">
       <Header />
-      <h2>Your record</h2>
+      <h2>{t.yourRecordTitle}</h2>
 
       {played === 0 ? (
         <p className="muted tiny" style={{ margin: 0 }}>
-          Nothing here yet. Finish a deck and your times show up on this screen.
+          {t.nothingHereYet}
         </p>
       ) : (
         <>
           {records.map((r) => (
             <div key={r.level} className="panel">
               <div className="scoreline win">
-                <span>{LEVEL_LABEL[r.level]}</span>
+                <span>{t.levelLabel[r.level]}</span>
                 <span className="mono">{r.best === null ? '··' : formatTime(r.best)}</span>
               </div>
               <span className="tiny muted">
                 {r.runs === 0
-                  ? 'not played yet'
-                  : `${r.runs} ${r.runs === 1 ? 'run' : 'runs'} · ${r.clean} without giving up${
-                      r.lastAt ? ` · last ${formatDay(r.lastAt)}` : ''
-                    }`}
+                  ? t.notPlayedYet
+                  : t.runsClean(r.runs, r.clean, r.lastAt ? formatDay(r.lastAt) : null)}
               </span>
             </div>
           ))}
 
           {h2h.wins + h2h.losses + h2h.ties > 0 && (
             <p className="tiny muted" style={{ margin: 0 }}>
-              Head to head against people who sent you a deck: {h2h.wins}W {h2h.losses}L{' '}
-              {h2h.ties}T.
+              {t.headToHead(h2h.wins, h2h.losses, h2h.ties)}
             </p>
           )}
 
           <div className="panel">
-            <span className="muted tiny">Recent runs</span>
+            <span className="muted tiny">{t.recentRuns}</span>
             <div className="splits">
               {recent.map((run) => (
                 <div key={`${run.level}-${run.seed}-${run.at}`} className="runrow">
                   <span className="tiny muted">{formatDay(run.at)}</span>
                   <span className="tiny">
-                    {run.level}
+                    {t.levelWord[run.level]}
                     {run.rivalTime !== null && (
                       <span className={run.mine.time <= run.rivalTime ? 'beat' : 'lost'}>
                         {' '}
-                        vs {run.rivalName}
+                        {t.vs(run.rivalName ?? '')}
                       </span>
                     )}
                   </span>
@@ -793,15 +785,12 @@ function RecordScreen({ name, onBack }: { name: string; onBack: () => void }) {
                 </div>
               ))}
             </div>
-            <span className="tiny muted">
-              Kept in this browser only. Nothing is uploaded, so a different device or a
-              cleared browser starts from zero.
-            </span>
+            <span className="tiny muted">{t.keptInBrowser}</span>
           </div>
         </>
       )}
 
-      <button onClick={onBack}>Back</button>
+      <button onClick={onBack}>{t.back}</button>
     </div>
   );
 }

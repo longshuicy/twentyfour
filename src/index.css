@@ -96,12 +96,34 @@ body {
    so it stays dominant on a phone as well as a desktop. */
 
 .banner {
+  position: relative;
   display: flex;
   flex-direction: column;
   /* "TwentyFour" has a descender on the y; a tight line-height plus a small
      gap put the tagline right underneath it. Both need room. */
   gap: 12px;
   padding: 4px 0 2px;
+}
+
+/* Sits in the banner's corner on every screen that shows it, small enough to
+   never compete with the masthead. */
+.langswitch {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  border: 0;
+  background: none;
+  color: var(--grey-600);
+  padding: 4px 2px;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.langswitch:hover:not(:disabled) {
+  background: none;
+  border: 0;
+  color: var(--ink);
 }
 
 h1 {
