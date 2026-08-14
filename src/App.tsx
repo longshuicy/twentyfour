@@ -141,7 +141,12 @@ export default function App() {
   const clockNow = pausedAt.current ?? now;
   const elapsed = screen === 'play' ? (clockNow - runStart.current) / 1000 + penalty : 0;
   const onThisHand = screen === 'play' ? (clockNow - handStart.current) / 1000 : 0;
-  const longWait = screen === 'play' && !revealed && onThisHand >= LONG_WAIT;
+  /* The hand has to still be in play. An answer on screen pauses the clock,
+     and a solved hand keeps ticking for the length of the celebration, so
+     without the `celebrating` guard a hand solved at 29s nudges at 30, on top
+     of its own success cue, for a hand the player already won. */
+  const longWait =
+    screen === 'play' && !revealed && !celebrating && onThisHand >= LONG_WAIT;
 
   /* An armed "Start over" disarms itself — leaving it hot for the rest of the
      hand turns a stray double-tap into a lost run. */
