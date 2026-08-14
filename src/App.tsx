@@ -450,12 +450,16 @@ export default function App() {
           </span>
         </div>
 
+        {/* A given-up hand stays red for the rest of the run. It used to go
+            white the moment you moved on, which quietly rewrote the run as
+            clean while you were still paying the penalty for it in the
+            clock. */}
         <div className="progress">
           {deck.hands.map((h, i) => (
             <span
               key={h.index}
               className={`pip${i < handIndex ? ' done' : ''}${
-                i === handIndex && revealed ? ' gaveup' : ''
+                gaveUpHands.has(i) ? ' gaveup' : ''
               }`}
             />
           ))}

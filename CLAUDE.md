@@ -97,9 +97,15 @@ src/App.tsx           screens: home / intro / play / done
   position, not from the last frame's result: a fast flick, or a backgrounded
   tab, can end a drag before any frame runs.
 - Pointer events for drag. No HTML5 drag-and-drop, no DnD library. The drop
-  target's op picker is a radial wheel that overflows the card (so a finger
-  can't cover the choices); its selection is by *direction* from the card's
-  centre, with a hub dead zone and a sticky margin outside the card.
+  target's op picker splits the target card into four corner-to-corner wedges;
+  its selection is by *direction* from the card's centre, with a hole at the
+  centre for the dead zone and a sticky margin outside the card.
+- **The picker's drawing and `sectorAt` must stay the same shape.** The angle
+  is measured in card-normalised space precisely so the 45 degree boundaries
+  land on the card's real diagonals: change the card's aspect ratio and
+  `CARD_RATIO` in `Board.tsx` has to follow `--card-h`, or the seams stop
+  running through the corners. The hole's radius is derived from `HUB` for the
+  same reason.
 - No new runtime dependencies without a clear reason. Current runtime deps are
   React and React DOM, full stop.
 

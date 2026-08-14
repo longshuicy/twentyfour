@@ -29,15 +29,20 @@ import { CardFace, faceClass, tileLabel } from './CardFace';
  *    the work more than once per frame buys nothing.
  */
 
-/* Ops live on a radial wheel that pops OVER the target card and reaches past
-   its edges, so the hand covering the card never covers the choices. Choice is
-   by direction from the card's centre, not by position within it: up +,
-   right ×, down −, left ÷. */
-const WHEEL: { op: Op; label: string; pos: string }[] = [
-  { op: '+', label: '+', pos: 'up' },
-  { op: '*', label: '×', pos: 'right' },
-  { op: '-', label: '−', pos: 'down' },
-  { op: '/', label: '÷', pos: 'left' },
+/* Ops live on a picker that splits the target CARD into four wedges, one per
+   corner-to-corner triangle: up +, right ×, down −, left ÷. Choice is by
+   direction from the card's centre, not by position within it, so the wedge a
+   finger is over is the wedge that fires.
+
+   Each op is DRAWN as exactly the region that selects it, which is why the
+   angles below are measured in card-normalised space rather than screen space:
+   a 1:1.42 card's diagonals run at about 55 degrees, not 45, and splitting on
+   45 would put the seams on the long edges instead of through the corners. */
+const WHEEL: { op: Op; label: string; pos: string; mid: number }[] = [
+  { op: '+', label: '+', pos: 'up', mid: 90 },
+  { op: '*', label: '×', pos: 'right', mid: 0 },
+  { op: '-', label: '−', pos: 'down', mid: 270 },
+  { op: '/', label: '÷', pos: 'left', mid: 180 },
 ];
 
 /** Dead zone at the hub, as a fraction of the card's short side. */
@@ -51,13 +56,100 @@ const STICKY = 0.85;
  */
 const ARM_REACH = 0.42;
 
-/** Index into WHEEL for a point near the target's centre, or null in the hub. */
+/* ---- wheel geometry ----
+
+   User units for the SVG below. Its viewBox is the card: 100 wide by
+   100 * CARD_RATIO tall, centred on the origin, so one user unit is one
+   hundredth of `--card-w` and the picker stays fluid with the card the way
+   everything else here does.
+
+   CARD_RATIO must track `--card-h` in index.css. It is the one number shared
+   with the stylesheet, and it is what puts the seams through the corners. */
+const CARD_RATIO = 1.42;
+const HALF_W = 50;
+const HALF_H = (100 * CARD_RATIO) / 2;
+
+/* The hole in the middle, DERIVED from HUB rather than eyeballed: it is the
+   dead zone, so any drift between the drawing and `sectorAt` shows up as a gap
+   you can be standing in while nothing is selected. Leaving it open is also
+   what keeps the target card's own value readable while you choose. */
+const HOLE_R = HUB * 100;
+/** How far out along its own axis a glyph sits, as a fraction of the half-span. */
+const LABEL_AT = 0.6;
+
+/**
+ * Point on the card's outline in the card-normalised direction `deg`.
+ *
+ * Normalised space is a square, so 45 degrees is a corner; scaling the unit
+ * square back out by the half-spans lands on the card's own corner.
+ */
+function edge(deg: number): [number, number] {
+  const a = (deg * Math.PI) / 180;
+  const k = Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
+  return [(HALF_W * Math.cos(a)) / k, (-HALF_H * Math.sin(a)) / k];
+}
+
+/**
+ * Point on the hole's rim below the card-normalised direction `deg`.
+ *
+ * The hole is a real circle, so the normalised direction has to be turned back
+ * into a real one first, or the seams would not meet its rim.
+ */
+function hole(deg: number): [number, number] {
+  const a = (deg * Math.PI) / 180;
+  const [ux, uy] = [HALF_W * Math.cos(a), HALF_H * Math.sin(a)];
+  const len = Math.hypot(ux, uy);
+  return [(HOLE_R * ux) / len, (-HOLE_R * uy) / len];
+}
+
+/** One corner-to-corner wedge, hole at the point, two card corners at the base. */
+function wedgePath(mid: number): string {
+  const a1 = mid - 45;
+  const a2 = mid + 45;
+  const [hx1, hy1] = hole(a1);
+  const [hx2, hy2] = hole(a2);
+  const [ex2, ey2] = edge(a2);
+  const [ex1, ey1] = edge(a1);
+  /* Sweep 0 runs anticlockwise on screen (rising angle with y flipped). The
+     arc is always well under a half turn, so the large-arc flag is 0. */
+  return [
+    `M ${hx1} ${hy1}`,
+    `A ${HOLE_R} ${HOLE_R} 0 0 0 ${hx2} ${hy2}`,
+    `L ${ex2} ${ey2}`,
+    `L ${ex1} ${ey1}`,
+    'Z',
+  ].join(' ');
+}
+
+/** Static, so the paths are laid out once for the module, not once per drag. */
+const SECTORS = WHEEL.map((q) => {
+  const vertical = q.mid === 90 || q.mid === 270;
+  const span = vertical ? HALF_H : HALF_W;
+  const a = (q.mid * Math.PI) / 180;
+  return {
+    ...q,
+    d: wedgePath(q.mid),
+    lx: span * LABEL_AT * Math.cos(a),
+    ly: -span * LABEL_AT * Math.sin(a),
+  };
+});
+
+/**
+ * Index into WHEEL for a point over the target, or null in the dead zone.
+ *
+ * The angle is measured in CARD-NORMALISED space, where the card is a square,
+ * so the 45 degree boundaries below are the card's own diagonals whatever its
+ * aspect ratio: each op owns the triangle running to one pair of corners, and
+ * that is exactly the shape `wedgePath` draws.
+ */
 function sectorAt(rect: DOMRect, x: number, y: number): number | null {
   const dx = x - (rect.left + rect.width / 2);
   // Screen y grows downward; flip so positive dy means "up" on the wheel.
   const dy = rect.top + rect.height / 2 - y;
+  /* The dead zone stays a real circle, in real pixels: it is a place a thumb
+     rests, not a place on a diagram. */
   if (Math.hypot(dx, dy) < Math.min(rect.width, rect.height) * HUB) return null;
-  const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const deg = (Math.atan2(dy / (rect.height / 2), dx / (rect.width / 2)) * 180) / Math.PI;
   if (deg >= 45 && deg < 135) return 0; // up      +
   if (deg >= -45 && deg < 45) return 1; // right   ×
   if (deg >= -135 && deg < -45) return 2; // down  −
@@ -151,8 +243,9 @@ export function Board({
   /** Which other tile the pointer is on or near, and which wheel sector of it. */
   function hitTest(x: number, y: number, selfId: string, stickyId: string | null) {
     /* An already-armed target keeps the drag even when the pointer strays well
-       past its edge. The wheel's spokes sit outside the card, so requiring the
-       finger to stay inside would make half of it unreachable. */
+       past its edge. Direction from the centre is what picks the op, and that
+       is still well defined outside the card, so releasing the target the
+       moment a finger slips off the edge would only cost accuracy. */
     if (stickyId && stickyId !== selfId) {
       const rect = rects.current.get(stickyId);
       if (rect && within(rect, Math.min(rect.width, rect.height) * STICKY, x, y)) {
@@ -292,19 +385,25 @@ export function Board({
             >
               <CardFace tile={tile} />
               {isTarget && (
-                <div className="wheel">
-                  <div className="hub" />
-                  {WHEEL.map((q, i) => (
-                    <div
+                <svg
+                  className="wheel"
+                  viewBox={`${-HALF_W} ${-HALF_H} ${HALF_W * 2} ${HALF_H * 2}`}
+                  aria-hidden="true"
+                >
+                  {SECTORS.map((q, i) => (
+                    <g
                       key={q.op}
-                      className={`spoke ${q.pos}${drag?.sector === i ? ' hot' : ''}${
+                      className={`sector${drag?.sector === i ? ' hot' : ''}${
                         guide && guide.op !== q.op ? ' off' : ''
                       }`}
                     >
-                      {q.label}
-                    </div>
+                      <path d={q.d} />
+                      <text x={q.lx} y={q.ly}>
+                        {q.label}
+                      </text>
+                    </g>
                   ))}
-                </div>
+                </svg>
               )}
             </div>
           </div>
