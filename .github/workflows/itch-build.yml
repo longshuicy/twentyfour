@@ -1,0 +1,31 @@
+name: Build itch.io bundle
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # itch.io hosts the game under its own CDN path, so this build uses
+      # relative asset paths instead of the /twentyfour/ base GitHub Pages needs.
+      - run: npx tsc --noEmit
+      - run: npx vite build --base=./ --outDir dist-itch
+      - name: Zip bundle
+        run: cd dist-itch && zip -r ../twentyfour-itch.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: twentyfour-itch
+          path: twentyfour-itch.zip
