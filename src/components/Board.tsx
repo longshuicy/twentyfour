@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { Op } from '../lib/solver';
 import type { HandState, Tile } from '../lib/hand';
 import { CardFace, faceClass, tileLabel } from './CardFace';
+import { opCue, play } from '../lib/sound';
 
 /**
  * 2x2 board with drag-to-combine.
@@ -206,6 +207,9 @@ export function Board({
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [fly, setFly] = useState<Fly | null>(null);
+  /* The refused drop needs a visual as well as a sound: a cue with no picture
+     behind it is the one case where a muted player loses information. */
+  const [rejected, setRejected] = useState<string | null>(null);
 
   const slots = useRef(new Map<string, HTMLDivElement>());
   /** Slot rects, measured once at pointerdown. Slots cannot move mid-drag. */
@@ -291,6 +295,7 @@ export function Board({
     for (const [id, el] of slots.current) rects.current.set(id, el.getBoundingClientRect());
 
     pointer.current = { x: e.clientX, y: e.clientY };
+    play('lift');
     setDragState({ tileId: tile.id, targetId: null, sector: null });
   }
 
@@ -306,6 +311,12 @@ export function Board({
       const hit = hitTest(pointer.current.x, pointer.current.y, current.tileId, current.targetId);
       // State only when the ANSWER changes, not when the pointer does.
       if (hit.targetId !== current.targetId || hit.sector !== current.sector) {
+        /* Two different cues, because they are two different events: landing
+           on a card is a contact, sliding between that card's wedges is a
+           detent. Both are throttled in sound.ts — a drag crosses seams far
+           faster than a sound can finish. */
+        if (hit.targetId && hit.targetId !== current.targetId) play('target');
+        else if (hit.sector !== current.sector && hit.sector !== null) play('wedge');
         setDragState({ ...current, ...hit });
       }
     });
@@ -347,7 +358,15 @@ export function Board({
         });
         window.setTimeout(() => setFly(null), MERGE_MS);
       }
+      play(opCue(op));
       onCombine(current.tileId, current.targetId, op);
+    } else if (current.targetId && op && !allowed) {
+      /* Only a REFUSED drop is a rejection. Releasing over no card at all is
+         a cancel: the player changed their mind, and scolding them for it is
+         the fastest way to make a sound track feel like nagging. */
+      play('reject');
+      setRejected(current.targetId);
+      window.setTimeout(() => setRejected(null), 400);
     }
     setDragState(null);
   }
@@ -369,6 +388,7 @@ export function Board({
            under the pointer covered the target and its options. */
         if (isDragging) classes.push('lifted');
         if (isTarget) classes.push('armed');
+        if (rejected === tile.id) classes.push('rejected');
         if (guide && !drag) {
           if (guide.fromId === tile.id) classes.push('guide-from');
           if (guide.toId === tile.id) classes.push('guide-to');

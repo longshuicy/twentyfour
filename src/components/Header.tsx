@@ -1,4 +1,5 @@
 import { useLang } from '../lib/i18n';
+import { play } from '../lib/sound';
 
 /**
  * The banner. Deliberately loud: it is the only branding the app has, and the
@@ -10,7 +11,13 @@ export function Header() {
   const { t, toggle } = useLang();
   return (
     <div className="banner">
-      <button className="langswitch" onClick={toggle}>
+      <button
+        className="langswitch"
+        onClick={() => {
+          play('nav');
+          toggle();
+        }}
+      >
         {t.langToggle}
       </button>
       <h1>TwentyFour</h1>

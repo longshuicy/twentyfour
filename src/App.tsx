@@ -166,6 +166,25 @@ export default function App() {
     play('longWait');
   }, [longWait, handIndex]);
 
+  /* Arriving at a dead end. Computed up here rather than read out of the
+     render helper below, because playing a sound during render is a side
+     effect in the one place React does not allow one.
+
+     The flag clears when the hand stops being dead, so undoing out of a dead
+     end and walking back into one sounds twice: both were arrivals, and each
+     was a deliberate move by the player. */
+  const deadNow = hand ? isDeadEnd(hand) : false;
+  const deadFor = useRef(-1);
+  useEffect(() => {
+    if (!deadNow) {
+      if (deadFor.current === handIndex) deadFor.current = -1;
+      return;
+    }
+    if (deadFor.current === handIndex) return;
+    deadFor.current = handIndex;
+    play('deadEnd');
+  }, [deadNow, handIndex]);
+
   const target = useMemo(() => {
     if (!incoming || incoming.results.length === 0) return null;
     return incoming.results.reduce((a, b) => (a.time <= b.time ? a : b));
@@ -200,6 +219,7 @@ export default function App() {
 
   function startFresh(level: Level) {
     saveName(name);
+    play('cta');
     setIncoming(null);
     clearUrlChallenge();
     startRun(randomSeedCode(), level);
@@ -208,6 +228,7 @@ export default function App() {
   function acceptChallenge() {
     if (!incoming) return;
     saveName(name);
+    play('cta');
     startRun(incoming.seed, incoming.level);
   }
 
@@ -244,6 +265,7 @@ export default function App() {
     }
     setHandIndex(next);
     setHand(initHand(deck.hands[next].cards));
+    play('advance');
     handStart.current = performance.now();
   }
 
@@ -259,7 +281,16 @@ export default function App() {
     const results = [...(incoming?.results ?? []), mine];
     const challenge: Challenge = { seed: deck.seed, level: deck.level, results };
     setIncoming(challenge);
+
+    /* One loud cue, best news first. Three sounds stacked on the same moment
+       read as a malfunction, and the done screen shows all three facts anyway,
+       so the sound only has to name the biggest one. `loadBest` has to be read
+       BEFORE `saveBest` overwrites it. */
+    const priorBest = loadBest(deck.level, deck.seed);
     saveBest(deck.level, deck.seed, total);
+    if (target && total < target.time) play('beatTarget');
+    else if (priorBest === null || total < priorBest) play('best');
+    else play('deckDone');
     saveHistoryEntry({ seed: deck.seed, level: deck.level, results, at: Date.now() });
     setScreen('done');
   }
@@ -299,7 +330,9 @@ export default function App() {
     const next = !muted;
     setMuted(next);
     setMutedState(next);
-    if (!next) play('succeed');
+    /* A sample of what sound is about to mean, not a reward. This used to
+       play the win cue, which made unmuting sound like solving a hand. */
+    if (!next) play('cta');
   }
 
   /* Copy only. An earlier version called navigator.share() first, which on
@@ -309,6 +342,7 @@ export default function App() {
   async function copyLink(url: string) {
     try {
       await navigator.clipboard.writeText(url);
+      play('copied');
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
@@ -345,7 +379,13 @@ export default function App() {
           </button>
           <button onClick={() => startFresh('hard')}>{t.playHard}</button>
         </div>
-        <button className="link" onClick={() => setScreen('tutorial')}>
+        <button
+          className="link"
+          onClick={() => {
+            play('nav');
+            setScreen('tutorial');
+          }}
+        >
           {t.howToPlay}
         </button>
         <RecordSummary name={name} onOpen={() => setScreen('record')} />
@@ -491,6 +531,8 @@ export default function App() {
             <span className="expr">{revealed}</span>
             <button
               className="primary"
+              /* No cue here: `advance` sounds the new hand, or the finish
+                 cue if that was the last one. */
               onClick={() => {
                 resumeClock();
                 advance((performance.now() - handStart.current) / 1000);
@@ -513,12 +555,21 @@ export default function App() {
               )
             )}
             <div className="row">
-              <button disabled={!canUndo(hand)} onClick={() => setHand(undo(hand))}>
+              <button
+                disabled={!canUndo(hand)}
+                onClick={() => {
+                  play('undo');
+                  setHand(undo(hand));
+                }}
+              >
                 {t.undo}
               </button>
               <button
                 disabled={!canUndo(hand)}
-                onClick={() => setHand(initHand(deck.hands[handIndex].cards))}
+                onClick={() => {
+                  play('reset');
+                  setHand(initHand(deck.hands[handIndex].cards));
+                }}
               >
                 {t.reset}
               </button>
@@ -527,8 +578,13 @@ export default function App() {
               <button
                 className={confirmRestart ? 'danger' : undefined}
                 onClick={() => {
-                  if (confirmRestart) startRun(deck.seed, deck.level);
-                  else setConfirmRestart(true);
+                  if (confirmRestart) {
+                    play('cta');
+                    startRun(deck.seed, deck.level);
+                  } else {
+                    play('arm');
+                    setConfirmRestart(true);
+                  }
                 }}
               >
                 {confirmRestart ? t.sure : t.startOver}
@@ -603,9 +659,17 @@ export default function App() {
         </div>
 
         <div className="row" style={{ marginTop: 8 }}>
-          <button onClick={() => startRun(deck.seed, deck.level)}>{t.replayDeck}</button>
           <button
             onClick={() => {
+              play('nav');
+              startRun(deck.seed, deck.level);
+            }}
+          >
+            {t.replayDeck}
+          </button>
+          <button
+            onClick={() => {
+              play('nav');
               setIncoming(null);
               clearUrlChallenge();
               setScreen('home');
@@ -709,7 +773,13 @@ function RecordSummary({ name, onOpen }: { name: string; onOpen: () => void }) {
   if (played === 0) return null;
 
   return (
-    <button className="recordbar" onClick={onOpen}>
+    <button
+      className="recordbar"
+      onClick={() => {
+        play('nav');
+        onOpen();
+      }}
+    >
       <span className="tiny">
         {records
           .filter((r) => r.best !== null)
@@ -790,7 +860,14 @@ function RecordScreen({ name, onBack }: { name: string; onBack: () => void }) {
         </>
       )}
 
-      <button onClick={onBack}>{t.back}</button>
+      <button
+        onClick={() => {
+          play('nav');
+          onBack();
+        }}
+      >
+        {t.back}
+      </button>
     </div>
   );
 }
