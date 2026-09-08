@@ -52,8 +52,9 @@ src/lib/deck.ts       pure buildDeck(seed, level) -> Hand[]
 src/lib/hand.ts       in-play tile bag + undo
 src/lib/challenge.ts  URL-fragment encode/decode
 src/lib/storage.ts    localStorage (name, bests, history)
-src/lib/sound.ts      three cue clips + mute toggle, all failing soft
-src/assets/*.mp3      long wait / give up / succeed clips
+src/lib/sound.ts      the cue table, mute toggle, per-cue throttle, all failing soft
+src/assets/*.mp3      long wait / give up / succeed clips (recordings)
+src/assets/cues/*.wav generated cues, committed; see scripts/gen-sounds.mjs
 src/components/       Board (pointer-event drag), CardFace, Header, Icons,
                       Tutorial (guided first hand)
 src/App.tsx           screens: home / intro / play / done
@@ -86,6 +87,18 @@ src/App.tsx           screens: home / intro / play / done
 - Sound is a bonus, never the message: every cue has a visual that means the
   same thing. Import clips from `src/assets` (never a literal `/assets/...`
   path — it 404s under the Pages base) and let every audio call fail silently.
+- **Cues are tiered, and the tier is baked into the file, not applied at
+  runtime.** `loud` is reserved for earned moments (a win, a give-up, the end
+  of a deck), `soft` answers a gesture, `whisper` fires constantly and sits at
+  the edge of hearing. Adding a cue means picking a tier in
+  `scripts/gen-sounds.mjs`, not adjusting a volume at the call site.
+- **One action, one cue.** A handler that sounds a cue and then calls something
+  that sounds another plays both: that is what made "Play easy" fire the CTA
+  twice. The cue belongs to whichever layer owns the action, and the other
+  layer stays quiet.
+- Cue files are generated and committed. `scripts/gen-sounds.mjs` seeds its
+  noise from the cue's own name, so a regeneration is a no-op diff; if it is
+  not, something changed on purpose or the script drifted.
 - A running CSS animation outranks the inline transform the drag writes, so any
   card-level animation must exclude `.dragging` and `.armed`, or dragging stops
   following the pointer.

@@ -579,6 +579,25 @@ button.danger {
   animation: none;
 }
 
+/* A refused drop, the tutorial's wrong-operator case. Red because it is the
+   penalty state, and short because it is a correction rather than a verdict.
+   Excluded while a drag is live: a running card animation outranks the inline
+   transform the drag writes, and the pointer would stop being followed. */
+.board:not(.dragging) .card.rejected {
+  animation: reject-nudge 320ms ease-in-out;
+  border-color: var(--red);
+}
+
+@keyframes reject-nudge {
+  25%,
+  75% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
 @keyframes breathe {
   50% {
     transform: translateY(-4px);
@@ -671,9 +690,12 @@ button.danger {
 @media (prefers-reduced-motion: reduce) {
   .board.won .card,
   .board.nudge .card,
+  .card.rejected,
   .app.shaking,
   .wheel,
   .proxy {
+    /* The rejected card keeps its red border here: that is the information,
+       the nudge was only the delivery. */
     animation: none;
   }
 }

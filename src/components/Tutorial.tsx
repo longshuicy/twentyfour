@@ -4,6 +4,7 @@ import { Header } from './Header';
 import type { Card, Level } from '../lib/deck';
 import { applyOp, initHand, type HandState } from '../lib/hand';
 import { useLang } from '../lib/i18n';
+import { play } from '../lib/sound';
 
 /**
  * A guided first hand.
@@ -58,6 +59,10 @@ export function Tutorial({
 
   function handleCombine(draggedId: string, targetId: string, op: Parameters<typeof applyOp>[3]) {
     setHand((current) => applyOp(current, draggedId, targetId, op));
+    /* Board has already sounded the operator. This is the progress on top of
+       it: a whisper mid-walkthrough, and the real win cue on the last step,
+       because that is the moment the board turns to `won`. */
+    play(step + 1 >= STEPS.length ? 'succeed' : 'step');
     setStep((s) => s + 1);
   }
 
@@ -68,7 +73,13 @@ export function Tutorial({
       <div className="topbar">
         <h2>{done ? t.thatIsWholeGame : t.howToPlayTitle}</h2>
         {!done && (
-          <button className="skip" onClick={onSkip}>
+          <button
+            className="skip"
+            onClick={() => {
+              play('nav');
+              onSkip();
+            }}
+          >
             {t.skipIKnowHow}
           </button>
         )}
@@ -96,12 +107,20 @@ export function Tutorial({
           {/* Both levels, in the same order and wording as the home screen.
               Finishing the walkthrough should not quietly narrow the choice. */}
           <div className="stack">
+            {/* No cue here: `onPlay` lands in startFresh, which sounds the
+                CTA itself. Doing both played it twice. */}
             <button className="primary" onClick={() => onPlay('easy')}>
               {t.playEasy}
             </button>
             <button onClick={() => onPlay('hard')}>{t.playHard}</button>
           </div>
-          <button className="link" onClick={onSkip}>
+          <button
+            className="link"
+            onClick={() => {
+              play('nav');
+              onSkip();
+            }}
+          >
             {t.backToStart}
           </button>
         </>
