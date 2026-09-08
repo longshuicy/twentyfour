@@ -1,0 +1,25 @@
+# The deploy and itch workflows only run on main, so nothing checked a pull
+# request before it merged: a type error reached main green and broke both.
+# This runs the same checks on the PR itself.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
